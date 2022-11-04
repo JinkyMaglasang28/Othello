@@ -13,7 +13,7 @@ WINDOWWIDTH = BLOCK_SIZE * 10
 WINDOWHEIGHT = BLOCK_SIZE * 10
 XMARGIN = int(((8 * BLOCK_SIZE)) / 2)
 YMARGIN = int(((8 * BLOCK_SIZE)) / 2)
-HINT_TILE = 'HINT_TILE'
+#HINT_TILE = 'HINT_TILE'
 
 #These variables for players
 debug = False
@@ -41,7 +41,7 @@ pygame.display.set_caption('Othello')
 font = pygame.font.SysFont("Helvetica", 48)
 icon = pygame.image.load("boardIcon.png")
 pygame.display.set_icon(icon)
-boardground = pygame.image.load('boardground.png')
+boardground = pygame.image.load('boardground.jpg')
 black = (pygame.image.load('black.png'))
 white = pygame.image.load('white.png')
 BGIMAGE = pygame.image.load('background.jpg')
@@ -116,9 +116,9 @@ def drawBoard():
     screen.blit(boardground, boardTable)
     menu = pygame.Rect(0, 480, WINDOWWIDTH, 20)
     pygame.draw.rect(screen, (255, 255, 255), menu)
-    drawText("Restart", menuFont, screen, 120, 480 - 1, (0, 0, 0))
+    #drawText("Restart", menuFont, screen, 120, 480 - 1, (0, 0, 0))
     drawText("Exit", menuFont, screen,220, 480 - 1, (0, 0, 0))
-    drawText("Hint", menuFont, screen, 320, 480 - 1, (0, 0, 0)) ## However it is not working
+    #drawText("Hint", menuFont, screen, 320, 480 - 1, (0, 0, 0)) ## However it is not working
 
     #These line for GameBoard
     for i in range(9):
