@@ -1,210 +1,118 @@
-from collections import deque
-from pickle import FALSE, FRAME
-#from tkinter.tix import WINDOW
-import pygame
-import sys, math, time
+import sys, time, math
+import copy
 import random
 
-# variables for board game
-BLOCK_SIZE = 50
-PADDING_SIZE = 5
-BOARD_WIDTH = BLOCK_SIZE * 8
-BOARD_HEIGHT = BLOCK_SIZE * 8 + 20
-FRAME_PER_SECOND = 40
-WINDOWWIDTH = BLOCK_SIZE * 10
-WINDOWHEIGHT = BLOCK_SIZE * 10
-XMARGIN = int(((8 * BLOCK_SIZE)) / 2)
-YMARGIN = int(((8 * BLOCK_SIZE)) / 2)
+#------------------------------------ MCT vs Minimax ------------------------------------
+#Decribe Variable
+#These variables for players
 HINT_TILE = 'HINT_TILE'
-retract_moves = deque(maxlen = 5)
-
-#variables for players
 MCTS_NUM = 2
-MAX_THINK_TIME = 5
-debug = False 
+debug = False
 player = 1
 victory = 0
 whiteTiles = 2
 blackTiles = 2
 useAI = True
 changed = True
-AIReadyToMove = False
+AIMinmax = True
+AIMCT = False
+move = (-1, -1)
+MAX_THINK_TIME = 20
+mTime= 0
+mcTime=0
 
-#variables for board
+#These variables for board
 board = [[0 for x in range(8)] for x in range(8)]
 board[3][3] = 1
 board[3][4] = 2
 board[4][3] = 2
 board[4][4] = 1
 
-#Creating a board
-pygame.init()
-screen = pygame.display.set_mode((WINDOWWIDTH, WINDOWHEIGHT))
-clock = pygame.time.Clock()
-pygame.display.set_caption('Othello')
-font = pygame.font.SysFont("Helvetica", 48)
-icon = pygame.image.load("boardIcon.png")
-pygame.display.set_icon(icon)
-boardground = pygame.image.load('boardground.jpg')
-black = (pygame.image.load('black.png'))
-white = pygame.image.load('white.png')
-BGIMAGE = pygame.image.load('background.jpg')
-BGIMAGE = pygame.transform.smoothscale(BGIMAGE, (WINDOWWIDTH, WINDOWHEIGHT))
-black_color= (0,0,0)
-menuFont = pygame.font.SysFont("comicsansms", 15)
-
 #newGame is starting method
 def newGame():
-    global changed #I said global for variable to access it.
-    # This loop over until the player exit.
-    while True:
-        # If AI move is True, go to the AIMove method.
-        if AIReadyToMove:
+    # I said global for variable to access it.
+    global changed
+    global mTime
+    global mcTime
+    # This loop over until the victory change that means the game is over.
+    while victory ==0 :
+        #If AIMinMax is True go to MinmaxMove method
+        if AIMinmax:
+            startMin = time.time()
+            AIMinMaxMove()
+            endMin = time.time()
+            print('Evaluation time for Minmax: {}s'.format(round(endMin - startMin, 7)))
+            mTime +=endMin - startMin
+        # If AIMCT is True go to MCTMove
+        elif AIMCT:
             start = time.time()
-            AIMove()
+            AIMCTMove()
             end = time.time()
-            print('Evaluation time: {}s'.format(round(end - start, 7)))
-        # Otherwise it is human so I have to control its mouse click.
-        else:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-                elif event.type == pygame.MOUSEBUTTONUP:
-                    x, y = event.pos
-                    if x >= 120 and x <= 175 and y >= 480:
-                        newGame()
-                    elif x >= 220 and x <= 250 + menuFont.size("Exit")[0] and y > 480:
-                        pygame.quit()
-                        sys.exit()
-                    elif x >= 50 and x <= 450 and y >= 50 and y <= 450:
-                        # I control the board x and y coordinates. When you run this game, there will be a board.
-                        # The board is actual board and there will be also a board that is game board inside the actual borad
-                        chessman_x = int(math.floor(x / (BLOCK_SIZE)) - 1) #convert RealBoard size to GameBoard
-                        chessman_y = int(math.floor(y / (BLOCK_SIZE)) - 1) #convert RealBoard size to GameBoard
-                        if debug:
-                            print("player " + str(player) + " x: " + str(chessman_x) + " y: " + str(
-                                chessman_y))
-                        try:
-                            playerMove(chessman_x, chessman_y)
-                        except Exception as e:
-                            print("Wrong Place")
-                else:
-                    pass
+            print('Evaluation time for MCT: {}s'.format(round(end - start, 7)))
+            mcTime +=end - start
         if changed:
-            drawBoard()
             changed = False
 
-        if AIReadyToMove:
-             AIMove()
-             drawBoard()
+        if AIMinmax:
+            startMin = time.time()
+            AIMinMaxMove()
+            endMin = time.time()
+            print('Evaluation time for Minmax: {}s'.format(round(endMin - startMin, 7)))
+            mTime += endMin - startMin
 
-        clock.tick(FRAME_PER_SECOND)
-    self.quitGame()
+        if AIMCT:
+            start = time.time()
+            AIMCTMove()
+            end = time.time()
+            print('Evaluation time for MCT: {}s'.format(round(end - start, 7)))
+            mcTime += end - start
 
-#This method for text on the actual board.
-def drawText(text, font, screen, x, y, rgb):
-    textObj = font.render(text, 1, (rgb[0],rgb[1],rgb[2]))
-    textRect = textObj.get_rect()
-    textRect.topleft = (x, y)
-    screen.blit(textObj, textRect)
-
-#This method draw the board in every change
-def drawBoard():
-    # These are for board background image and menu.
-    background = pygame.Rect(0,0,WINDOWWIDTH,WINDOWHEIGHT)
-    screen.blit(BGIMAGE, background)
-    boardTaabla = pygame.Rect(BLOCK_SIZE, BLOCK_SIZE, BOARD_WIDTH, BOARD_HEIGHT)
-    screen.blit(boardground, boardTaabla)
-    menu = pygame.Rect(0, 480, WINDOWWIDTH, 20)
-    pygame.draw.rect(screen, (255, 255, 255), menu)
-    menuFont = pygame.font.SysFont("comicsansms", 15)
-    drawText("Restart", menuFont, screen, 120, 480 - 1, (0, 0, 0))
-    drawText("Exit", menuFont, screen,220, 480 - 1, (0, 0, 0))
-    drawText("Hint", menuFont, screen, 320, 480 - 1, (0, 0, 0)) ## However it is not working
-
-    # These line for GameBoard
-    for i in range(9):
-        startx = (i * 50) + BLOCK_SIZE
-        starty = BLOCK_SIZE
-        endx = (i * 50) + BLOCK_SIZE
-        endy = BLOCK_SIZE + (8 * 50)
-        pygame.draw.line(screen, black_color, (startx, starty), (endx, endy))
-    for i in range(9):
-        startx = BLOCK_SIZE
-        starty = (i * 50) + BLOCK_SIZE
-        endx = BLOCK_SIZE + (8 * 50)
-        endy = (i * 50) + BLOCK_SIZE
-        pygame.draw.line(screen, black_color, (startx, starty), (endx, endy))
-
-    # gameBoard(boad) is 2D array.
-    # If an element in the array is 1 that means the element is black otherwise white.
-    for row in range(0, 8):
-        for col in range(0, 8):
-            block = board[row][col]
-            chessman_size = BLOCK_SIZE - 2 * PADDING_SIZE
-            chessman = pygame.Rect(row * BLOCK_SIZE + PADDING_SIZE + BLOCK_SIZE, col * BLOCK_SIZE + PADDING_SIZE + BLOCK_SIZE,chessman_size, chessman_size)
-            if block == 1:
-                screen.blit(black, chessman)
-            elif block == 2:
-                screen.blit(white, chessman)
-            elif block == 0:
-                pass
-            else:
-                sys.exit('Error occurs - player number incorrect!')
-
-    if victory == -1:
-        drawText("Draw! " + str(whiteTiles) + ":" + str(blackTiles), font, screen, 50, 10, (255, 128, 0))
-    elif victory == 1:
-        if useAI:
-            drawText("You Won! " + str(blackTiles) + ":" + str(whiteTiles),font, screen, 50, 10, (255, 128, 0))
-    elif victory == 2:
-        if useAI:
-            drawText("MCT Won! " + str(whiteTiles) + ":" + str(blackTiles), font, screen, 50, 10, (255, 128, 0))
-
-    pygame.display.update()
-
-#I check the player's move
-def playerMove(x, y):
-    global AIReadyToMove
-    if victory != 0 or (useAI and player != 1):
-        return
-    performMove(x, y)
-    if useAI and player == 2:
-        AIReadyToMove = True
-        if debug:
-            print("AI is ready to move!")
-
-def performMove( x, y):
+def performMove(x, y):
     global changed
-    global victory
-    global blackTiles
-    global whiteTiles
     global player
-    global AIReadyToMove
+    global debug
+    global victory
+    global whiteTiles
+    global blackTiles
 
-    if board[x][y] != 0:
-        print(" - Block has already been occupied!")
-    else:
-        numFlipped = isAvaible(board, x, y, player, PLAYMODE=True)
-        if debug:
-            print("Flipped " + str(numFlipped) + " pieces!")
+    numFlipped = isAvaible(board, x, y, player, PLAYMODE=True)
+    if debug:
+        print("Flipped " + str(numFlipped) + " pieces!")
+    changed = True
+
+    #check the game is over
+    allTiles = [item for sublist in board for item in sublist]
+    emptyTiles = sum(1 for tile in allTiles if tile == 0)
+    whiteTiles = sum(1 for tile in allTiles if tile == 2)
+    blackTiles = sum(1 for tile in allTiles if tile == 1)
+    print("Current state - empty: " + str(emptyTiles) + " white: " + str(
+        whiteTiles) + " black: " + str(blackTiles))
+
+    if debug:
+        for x in range(0, 8):
+            for y in range(0, 8):
+                print(str(board[x][y]) + " ", end='')
+            print('')
+
+    if whiteTiles < 1 or blackTiles < 1 or emptyTiles < 1:
+        if whiteTiles > blackTiles:
+            victory = 2
+        elif whiteTiles < blackTiles:
+            victory = 1
+        else:
+            victory = -1
         changed = True
-
-        # check game ending
-        allTiles = [item for sublist in board for item in sublist]
-        emptyTiles = sum(1 for tile in allTiles if tile == 0)
-        whiteTiles = sum(1 for tile in allTiles if tile == 2)
-        blackTiles = sum(1 for tile in allTiles if tile == 1)
-        print("Current state - empty: " + str(emptyTiles) + " white: " + str(
-            whiteTiles) + " black: " + str(blackTiles))
-
+        whiteTiles = whiteTiles
+        blackTiles = blackTiles
+        return
+    movesFound = moveCanBeMade(board, 3 - player)
+    if not movesFound:
         if debug:
-            for x in range(0, 8):
-                for y in range(0, 8):
-                    print(str(board[x][y]) + " ", end='')
-
-        if whiteTiles < 1 or blackTiles < 1 or emptyTiles < 1:
+            print("Player " + str(3 - player) + " cannot move!")
+        movesFound = moveCanBeMade(board, player)
+        if not movesFound:
+            if debug:
+                print("Player " + str(player) + "cannot move either!")
             if whiteTiles > blackTiles:
                 victory = 2
             elif whiteTiles < blackTiles:
@@ -215,36 +123,17 @@ def performMove( x, y):
             whiteTiles = whiteTiles
             blackTiles = blackTiles
             return
-        movesFound = moveCanBeMade(board, 3 - player)
-        if not movesFound:
-            if debug:
-                print("Player " + str(3 - player) + " cannot move!")
-            movesFound = moveCanBeMade(board, player)
-            if not movesFound:
-                if debug:
-                    print("Player " + str(player) + "cannot move either!")
-                if whiteTiles > blackTiles:
-                    victory = 2
-                elif whiteTiles < blackTiles:
-                    victory = 1
-                else:
-                    victory = -1
-                changed = True
-                whiteTiles = whiteTiles
-                blackTiles = blackTiles
-                return
-            else:
-                if debug:
-                    print("Player " + str(player) + " can move, then move!")
-                if useAI and player == 2:
-                    AIMove()
-                    AIReadyToMove = False
-                    changed = True
         else:
-            player = 3 - player
+            if debug:
+                print("Player " + str(player) + " can move, then move!")
+            if useAI and player == 2:
+                performMoveMinMax()
             changed = True
+    else:
+        player = 3 - player
+        changed = True
 
-#It is check the move can be made with isAvaible method.
+#It is check the move can be made with isAvaible method for Minimax.
 def moveCanBeMade(board, playerID):
     movesFound = False
     for row in range(0, 8):
@@ -252,19 +141,29 @@ def moveCanBeMade(board, playerID):
             if movesFound:
                 continue
             elif board[row][col] == 0:
-                if isAvaible(board, row, col, playerID, PLAYMODE=False) > 0:
+                numAvailableMoves = isAvaible(board, row, col, playerID, PLAYMODE=False)
+                if numAvailableMoves > 0:
                     movesFound = True
     return movesFound
 
-#This method goes to AI.
-def AIMove():
+#This Method for Minimax Move
+def AIMinMaxMove():
+    global AIMinmax
+    global AIMCT
+
+    performMoveMinMax()
+    AIMinmax = False
+    AIMCT = True
+
+#This Method for MCT Move
+def AIMCTMove():
     current_path = []  # tofind current path
     root = expanding()  # I create an expand node for player 2 that is AI
     root_copy = expanding()
     mcts_search(current_path, root_copy, root)
     maxValue = -1
     result = (0, 0)
-    # MCT move coordinates
+    #MCT move coordinates
     for n in root:
         mct_move, lay, win, child = n
         if (lay > 0) and (win / lay > maxValue):
@@ -273,11 +172,12 @@ def AIMove():
 
     x = result[0]
     y = result[1]
-    performMove(x,y)
-    global AIReadyToMove
-    AIReadyToMove = False
+    performMove(x, y)
+    global AIMCT
+    global AIMinmax
 
-################ MCT ALGORITHM ########################
+    AIMCT = False
+    AIMinmax = True
 
 # Selecting- Search the Tree
 def mcts_search(current_path, root_copy, root):
@@ -322,36 +222,44 @@ def mcts_search(current_path, root_copy, root):
                 current_children[count] = (mct_move, lay, win, child)
             current_children = child
 
-def findMaxBestNode(node, loop, max, list, index):
+def findMaxBestNode(n_tuple, loop, maxval, maxidxlist, index):
     # Calculate UCB
-    cval = ucb(node, loop, 0.1)
+    cval = ucb(n_tuple, loop, 0.1)
     # Add calculateion result in a list
-    if cval >= max:
-        if cval == max:
-            list.append(index)
+    if cval >= maxval:
+        if cval == maxval:
+            maxidxlist.append(index)
         else:
-            list = [index]
-            max = cval
-    return list,max
+            maxidxlist = [index]
+            maxval = cval
+    return maxidxlist,maxval
 
-def findMinBestNode(node, loop, min, list, index):
+def findMinBestNode(n_tuple, loop, maxval, maxidxlist, index):
     # Calculate UCB
-    cval = ucb(node, loop, -0.1)
+    cval = ucb(n_tuple, loop, -0.1)
     # Add calculateion result in a list
-    if cval <= min:
-        if cval == min:
-            list.append(index)
+    if cval <= maxval:
+        if cval == maxval:
+            maxidxlist.append(index)
         else:
-            list = [index]
-            min = cval
-        return list,min
+            maxidxlist = [index]
+            maxval = cval
+        return maxidxlist,maxval
 
 #Simulating
 def simulating(list):
     randValue = list[random.randrange(0, len(list))] # select randomly
     return randValue
 
+#This method checks the game rules.
 def isAvaible(board, row, col, playerID, PLAYMODE=True):
+    global changed
+    global player
+    global debug
+    global victory
+    global whiteTiles
+    global blackTiles
+
     if PLAYMODE:
         board[row][col] = player
     count = 0
@@ -558,14 +466,15 @@ def isAvaible(board, row, col, playerID, PLAYMODE=True):
     return count
 
 #Calculate UCB
-def ucb(node, t, value):
+def ucb(node, t, cval):
     name, lay, win, child = node
     if lay == 0:
-        lay = 0.00000000001  # when you divide zero it will be infinity
+        lay = 0.00000000001 #when you divide zero it will be infinity
     if t == 0:
-        t = 1  # log0 is can not calculate
-    return (win / lay) + value * math.sqrt(2 * math.log(t) / lay)
+        t = 1 #log0 is can not calculate
+    return (win / lay) + cval * math.sqrt(2 * math.log(t) / lay)
 
+#Expanding
 def expanding():
     place_count = []
     result = []
@@ -580,5 +489,103 @@ def expanding():
         result.append((n, 0, 0, []))
     return result
 
+#This method for Minimax Algorithm.
+def performMoveMinMax():
+    tmpBoard = [row[:] for row in board]
+    startTime = time.time()
+    timeElapsed = 0
+    depth = 2
+    optimalMove = (-1, -1)
+    optimalBoard = tmpBoard
+    stop = False #this value for ending the minmax algorithm. If the successboard is true then stop the minmax algorithm.
+    currentLevel =0
+    # I did 'timeElapsed < 5' because the minimax algorithm time will be less than 5 in a move.
+    while not stop and timeElapsed < 5:
+        (stop, optimalBoard) = miniMax(tmpBoard, currentLevel, depth, player , -math.inf, math.inf,stop)
+        endTime = time.time()
+        timeElapsed += endTime - startTime
+        startTime = endTime
+        #depth += 1 (actually when you increase depth in every move, the minimax algorithm gives better results.)
+
+    for row in range(0, 8):
+        for col in range(0, 8):
+            if tmpBoard[row][col] != optimalBoard[row][col]:
+                optimalMove = (row, col)
+
+    move = optimalMove
+    performMove(move[0], move[1])
+
+#For minimax algorithm
+def miniMax(board, currentLevel, maxLevel, player, alpha, beta,stop):
+    all = [item for sublist in board for item in sublist]
+    white = sum(1 for tile in all if tile == 2)
+    black = sum(1 for tile in all if tile == 1)
+    successBoards = []
+
+    if (not moveCanBeMade(board, player) or currentLevel == maxLevel):
+        return (stop, board)
+    if white > black:
+        diff = (white / (black + white)) * 100
+    else:
+        diff = - (black / (black + white)) * 100
+    # Mobility controls how many steps can player move.
+    # first player is black
+    # second player is white
+    if moveCanBeMade(board, 1) + moveCanBeMade(board, 2) == 0:
+        mobility = 0
+    else:
+        mobility = 100 * moveCanBeMade(board, 2) / (moveCanBeMade(board, 2) + moveCanBeMade(board, 1))
+
+    # Update the sucessorBoard
+    for row in range(0, 8):
+        for col in range(0, 8):
+            if board[row][col] == 0:
+                numAvailableMoves = isAvaible(board, row, col, player, PLAYMODE=False)
+                if numAvailableMoves > 0:
+                    successBoard = [row[:] for row in board]
+                    successBoard[row][col] = player
+                    successBoards.append(successBoard)
+
+    if len(successBoards) == 0:
+        stop = True
+        return (stop, board)
+    bestBoard = None
+
+    # If player is 1 that means white, check the alpha value.
+    # If the value is smaller than best update bestBoard
+    if player == 1:
+        maxValue = -math.inf #alpha
+        for i in range(0, len(successBoards)):
+            stop, boardS = miniMax(successBoards[i], currentLevel + 1, maxLevel, 2, alpha,beta,stop)
+            best = diff + mobility  #best is heuristics for nonfinal node.
+            if best > maxValue:
+                maxValue = best
+                bestBoard = successBoards[i]
+            alpha = max(alpha, best)
+            if best >= beta:
+                return (stop, boardS)
+    # If player is 2 that means white, check the beta value.
+    # If the value is greather than utility update bestBoard
+    else:
+        minValue = math.inf
+        for i in range(0, len(successBoards)):
+            stop, boardS = miniMax(successBoards[i], currentLevel + 1, maxLevel, 1, alpha,beta,stop)
+            best = diff + mobility
+            if best < minValue:
+                minValue = best
+                bestBoard = successBoards[i]
+            beta = min(beta, best)
+            if best <= alpha:
+                return (stop, boardS)
+
+    return (stop, bestBoard)
+
 if __name__ == '__main__':
     newGame()
+    if victory == 2:
+        print("MCT Won!")
+    elif victory == 1:
+        print("Min-Max Won!")
+    elif victory == -1:
+        print("Draw!")
+
